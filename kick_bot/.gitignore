@@ -1,17 +1,9 @@
-# Скрываем базу данных
+downloaded_images/
 *.db
-*.sqlite
-*.sqlite3
-
-# Скрываем медиа
-*.png
-*.jpg
-*.jpeg
+*.session
+*.session-journal
 *.mp3
-*.wav
-
-# Скрываем системный мусор Python
+*.jpg
+*.png
 __pycache__/
-*.pyc
-venv/
 .env
