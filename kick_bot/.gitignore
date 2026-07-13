@@ -1,0 +1,17 @@
+# Скрываем базу данных
+*.db
+*.sqlite
+*.sqlite3
+
+# Скрываем медиа
+*.png
+*.jpg
+*.jpeg
+*.mp3
+*.wav
+
+# Скрываем системный мусор Python
+__pycache__/
+*.pyc
+venv/
+.env
