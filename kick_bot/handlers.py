@@ -18,6 +18,7 @@ class QuestStates(StatesGroup):
 def get_main_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="⚔️ Мои квесты", callback_data="go_list")],
+        [InlineKeyboardButton(text="🔥 Мои привычки", callback_data="go_habits")],
         [InlineKeyboardButton(text="➕ Добавить квест", callback_data="go_add")],
         [InlineKeyboardButton(text="📊 Статистика", callback_data="go_stats")],
         [InlineKeyboardButton(text="📂 Категории", callback_data="go_categories")],
@@ -284,3 +285,28 @@ async def show_category_quests(call: CallbackQuery, state: FSMContext):
     
     await call.message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb_list), parse_mode="Markdown")
     await call.answer()
+@router.callback_query(F.data == "go_habits")
+async def show_habits(call: CallbackQuery, state: FSMContext):
+    habits = await database.get_habits(call.from_user.id)
+    kb = []
+    for h in habits:
+        # h[0]=id, h[1]=title, h[2]=streak
+        kb.append([InlineKeyboardButton(text=f"{h[1]} | 🔥 {h[2]}", callback_data=f"habit_{h[0]}")])
+    
+    # Здесь можно добавить кнопку для добавления привычки в будущем
+    kb.append([InlineKeyboardButton(text="🔙 Назад", callback_data="go_start")])
+    
+    await call.message.edit_text("🔥 **Твои привычки:**", reply_markup=InlineKeyboardMarkup(inline_keyboard=kb), parse_mode="Markdown")
+
+@router.callback_query(F.data.startswith("habit_"))
+async def process_habit(call: CallbackQuery, state: FSMContext):
+    h_id = int(call.data.split("_")[1])
+    success, streak = await database.check_habit(h_id)
+    
+    if success:
+        await call.answer(f"✅ Отлично! Твоя серия: {streak} дней!", show_alert=True)
+    else:
+        await call.answer(f"Ты уже отмечал это сегодня. Твоя серия: {streak} дней.", show_alert=True)
+    
+    # Обновляем список привычек после отметки
+    await show_habits(call, state)

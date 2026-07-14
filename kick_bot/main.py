@@ -8,13 +8,12 @@ from datetime import datetime, timedelta
 import aiosqlite
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-# Функция для фоновой проверки дедлайнов (исправленная)
+# Функция для фоновой проверки дедлайнов
 async def check_deadlines(bot: Bot):
     while True:
         await asyncio.sleep(60)
         try:
             async with aiosqlite.connect("quests.db") as db:
-                # ВАЖНО: добавили reminded_steps в SELECT
                 async with db.execute("SELECT id, user_id, title, deadline, reminded_steps FROM quests WHERE status = 'active'") as cursor:
                     rows = await cursor.fetchall()
                     
@@ -24,7 +23,6 @@ async def check_deadlines(bot: Bot):
                         deadline = datetime.fromisoformat(deadline_str)
                         seconds_left = int((deadline - now).total_seconds())
                         
-                        # 1. Проверка на просрочку
                         if seconds_left <= 0:
                             await db.execute(
                                 "UPDATE quests SET status = 'failed', finished_at = ? WHERE id = ?", 
@@ -34,7 +32,6 @@ async def check_deadlines(bot: Bot):
                             await bot.send_message(user_id, f"💀 Квест «{title}» провален!\n\nТы проиграл свою гонку, сынок.")
                             continue 
 
-# 2. Логика напоминаний (исправлено: не шлет, если время квеста уже "ушло" для этого порога)
                         thresholds = [
                             (43200, "12ч", "12"),
                             (21600, "6ч", "6"),
@@ -44,25 +41,38 @@ async def check_deadlines(bot: Bot):
                         
                         current_steps = str(reminded_steps) if reminded_steps else ""
                         for sec, text, step_id in thresholds:
-                            # Проверяем, наступило ли время напоминания
                             if seconds_left <= sec and step_id not in current_steps.split(','):
-                                
-                                # Шлем сообщение, только если квест не создали слишком поздно для этого порога
-                                # (допустимый "зазор" 5 минут / 300 секунд)
                                 if seconds_left > (sec - 300):
                                     await bot.send_message(
                                         user_id, 
                                         f"⚠️ **Напоминание!**\n\nКвест «{title}» заканчивается через {text}!",
                                         parse_mode="Markdown"
                                     )
-                                
-                                # В любом случае помечаем шаг как пройденный, чтобы не слать его позже
                                 new_steps = (current_steps + "," if current_steps else "") + step_id
                                 await db.execute("UPDATE quests SET reminded_steps = ? WHERE id = ?", (new_steps, q_id))
                                 await db.commit()
-                                break # Прерываем цикл, так как мы нашли самый актуальный порог
+                                break 
         except Exception as e:
-            print(f"Ошибка в фоновой задаче: {e}")
+            print(f"Ошибка в фоновой задаче квестов: {e}")
+
+# Функция напоминания о привычках
+async def check_habit_reminders(bot: Bot):
+    while True:
+        # Проверяем раз в час
+        await asyncio.sleep(3600)
+        try:
+            async with aiosqlite.connect("quests.db") as db:
+                today = datetime.now().strftime("%Y-%m-%d")
+                async with db.execute("SELECT user_id, title, last_check_date FROM habits") as cursor:
+                    habits = await cursor.fetchall()
+                    for user_id, title, last_date in habits:
+                        if last_date != today:
+                            await bot.send_message(
+                                user_id, 
+                                f"🔥 **Привычка ждет!**\n\nТы еще не отметился в привычке «{title}» на сегодня. Не позволяй серии прерваться!"
+                            )
+        except Exception as e:
+            print(f"Ошибка в напоминании о привычках: {e}")
 
 # Функция для утреннего отчета
 async def morning_digest(bot: Bot):
@@ -88,22 +98,18 @@ async def morning_digest(bot: Bot):
             print(f"Ошибка в утреннем дайджесте: {e}")
         await asyncio.sleep(60)
 
-# Функция для удаления сообщения
-async def delete_message_after(bot: Bot, message, delay: int):
-    await asyncio.sleep(delay)
-    try:
-        await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
-    except Exception as e:
-        print(f"Не удалось удалить сообщение: {e}")
-
 async def main():
     load_dotenv()
     bot = Bot(token=os.getenv("BOT_TOKEN"))
     dp = Dispatcher()
     await database.init_db()
     dp.include_router(router)
+    
+    # Запускаем все задачи
     asyncio.create_task(check_deadlines(bot))
     asyncio.create_task(morning_digest(bot))
+    asyncio.create_task(check_habit_reminders(bot)) 
+    
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
