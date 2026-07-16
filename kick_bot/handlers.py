@@ -86,7 +86,8 @@ async def show_list(call: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data.startswith(("win_", "fail_")))
 async def process_quest_result(call: CallbackQuery, state: FSMContext):
     action, quest_id = call.data.split("_")
-    await cleanup_quest_message(call.bot, call.from_user.id, int(quest_id))
+    quest_id = int(quest_id)
+    await cleanup_quest_message(call.bot, call.from_user.id, quest_id)
     status = "won" if action == "win" else "failed"
     phrase = random.choice(WIN_PHRASES if action == "win" else FAIL_PHRASES)
     await database.change_quest_status(quest_id, status)
@@ -109,8 +110,15 @@ async def start_add(call: CallbackQuery, state: FSMContext):
 @router.message(QuestStates.add_quest)
 async def process_add(msg: Message, state: FSMContext):
     deadline = parse_deadline(msg.text)
+
+    category_match = re.search(r'#(\S+)', msg.text)
+    category = category_match.group(1).strip().lower() if category_match else "общие"
+
     clean_title = re.sub(r'\s*\d+ч', '', msg.text)
-    category = clean_title.split("#")[-1].strip().lower() if "#" in clean_title else "общие"
+    clean_title = re.sub(r'\s*\d+м', '', clean_title)
+    clean_title = re.sub(r'\s*#\S+', '', clean_title)
+    clean_title = clean_title.strip()
+
     await database.add_quest(msg.from_user.id, clean_title, deadline.isoformat(), category)
     data = await state.get_data()
     await msg.delete()

@@ -11,13 +11,16 @@ logger = logging.getLogger(__name__)
 
 KIEV_TZ = pytz.timezone("Europe/Kiev")
 
+# Пороги ОБЯЗАТЕЛЬНО должны идти от МЕНЬШЕГО к БОЛЬШЕМУ,
+# иначе цикл в check_deadlines всегда будет находить "48ч" первым.
 DEADLINE_THRESHOLDS = [
-    (172800, "48ч", "48"),
-    (43200, "12ч", "12"),
-    (21600, "6ч", "6"),
-    (3600, "1ч", "1"),
     (1800, "30м", "0.5"),
+    (3600, "1ч", "1"),
+    (21600, "6ч", "6"),
+    (43200, "12ч", "12"),
+    (172800, "48ч", "48"),
 ]
+
 
 async def check_deadlines(bot: Bot):
     logger.info("Задача check_deadlines запущена.")
@@ -25,12 +28,23 @@ async def check_deadlines(bot: Bot):
         try:
             now = datetime.now(KIEV_TZ).replace(tzinfo=None)
             rows = await database.get_active_quests_for_deadlines()
+        except Exception as e:
+            logger.error(f"Ошибка получения квестов в check_deadlines: {e}")
+            await asyncio.sleep(60)
+            continue
 
-            for q_id, user_id, title, deadline_str, reminded_steps in rows:
+        for q_id, user_id, title, deadline_str, reminded_steps in rows:
+            try:
                 deadline = datetime.fromisoformat(deadline_str)
                 seconds_left = int((deadline - now).total_seconds())
 
                 if seconds_left <= 0:
+                    old_msg_id = await database.get_quest_last_message_id(q_id)
+                    if old_msg_id:
+                        try:
+                            await bot.delete_message(chat_id=user_id, message_id=old_msg_id)
+                        except Exception:
+                            pass
                     await database.mark_quest_failed(q_id, now.isoformat())
                     await bot.send_message(user_id, f"💀 Квест «{title}» провален!")
                     continue
@@ -45,22 +59,25 @@ async def check_deadlines(bot: Bot):
                                     await bot.delete_message(chat_id=user_id, message_id=old_msg_id)
                                 except Exception:
                                     pass
-                            
+
                             # 2. Отправляем новое сообщение
                             msg = await bot.send_message(
                                 user_id,
                                 f"⚠️ **Напоминание!**\n\nКвест «{title}» заканчивается через {text}!",
                                 parse_mode="Markdown",
                             )
-                            
+
                             # 3. Сохраняем ID нового сообщения и обновляем шаг
                             await database.update_quest_reminded_steps(q_id, step_id)
-                            await database.update_quest_last_message_id(q_id, msg.message_id) 
+                            await database.update_quest_last_message_id(q_id, msg.message_id)
                         break
-        except Exception as e:
-            logger.error(f"Ошибка в check_deadlines: {e}")
-        
+            except Exception as e:
+                logger.error(f"Ошибка обработки квеста {q_id}: {e}")
+                continue
+
         await asyncio.sleep(60)
+
+
 async def check_habit_reminders(bot: Bot):
     logger.info("Задача check_habit_reminders запущена.")
     while True:
@@ -114,5 +131,3 @@ async def morning_digest(bot: Bot):
             logger.error(f"Ошибка в утреннем дайджесте: {e}")
 
         await asyncio.sleep(60)
-
-# Остальные функции (check_habit_reminders и morning_digest) остаются без изменений
