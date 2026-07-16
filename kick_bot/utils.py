@@ -11,6 +11,11 @@ logger = logging.getLogger(__name__)
 
 KIEV_TZ = pytz.timezone("Europe/Kyiv")
 
+# Терпимы к пробелу и полным словам: "5ч", "5 ч", "5час", "5 часа", "5 часов"
+HOURS_PATTERN = r'(\d+)\s*ч(?:ас(?:ов|а)?)?'
+# Терпимы к пробелу и полным словам: "30м", "30 м", "30мин", "30 минут", "30 минуты"
+MINUTES_PATTERN = r'(\d+)\s*м(?:ин(?:ут(?:ы)?)?)?'
+
 
 def get_main_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -52,8 +57,8 @@ async def get_habits_markup(user_id):
 
 
 def parse_deadline(text):
-    hours_match = re.search(r'(\d+)ч', text)
-    minutes_match = re.search(r'(\d+)м', text)
+    hours_match = re.search(HOURS_PATTERN, text, re.IGNORECASE)
+    minutes_match = re.search(MINUTES_PATTERN, text, re.IGNORECASE)
     hours = int(hours_match.group(1)) if hours_match else 0
     minutes = int(minutes_match.group(1)) if minutes_match else 0
     now = datetime.now(KIEV_TZ).replace(tzinfo=None)

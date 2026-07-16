@@ -17,6 +17,8 @@ from utils import (
     cleanup_habit_message,
     get_habits_markup,
     parse_deadline,
+    HOURS_PATTERN,
+    MINUTES_PATTERN,
 )
 
 router = Router()
@@ -116,10 +118,10 @@ async def process_add(msg: Message, state: FSMContext):
     category_match = re.search(r'#(\S+)', msg.text)
     category = category_match.group(1).strip().lower() if category_match else "общие"
 
-    clean_title = re.sub(r'\s*\d+ч', '', msg.text)
-    clean_title = re.sub(r'\s*\d+м', '', clean_title)
+    clean_title = re.sub(r'\s*' + HOURS_PATTERN, '', msg.text, flags=re.IGNORECASE)
+    clean_title = re.sub(r'\s*' + MINUTES_PATTERN, '', clean_title, flags=re.IGNORECASE)
     clean_title = re.sub(r'\s*#\S+', '', clean_title)
-    clean_title = clean_title.strip()
+    clean_title = re.sub(r'\s+', ' ', clean_title).strip()
 
     await database.add_quest(msg.from_user.id, clean_title, deadline.isoformat(), category)
     data = await state.get_data()
