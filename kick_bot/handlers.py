@@ -81,6 +81,7 @@ async def show_list(call: CallbackQuery, state: FSMContext):
         reply_markup=InlineKeyboardMarkup(inline_keyboard=kb_list),
         parse_mode="Markdown",
     )
+    await call.answer()
 
 
 @router.callback_query(F.data.startswith(("win_", "fail_")))
@@ -105,6 +106,7 @@ async def start_add(call: CallbackQuery, state: FSMContext):
         ]),
     )
     await state.update_data(last_msg_id=msg.message_id)
+    await call.answer()
 
 
 @router.message(QuestStates.add_quest)
@@ -139,6 +141,7 @@ async def show_habits(call: CallbackQuery, state: FSMContext):
         reply_markup=await get_habits_markup(call.from_user.id),
         parse_mode="Markdown",
     )
+    await call.answer()
 
 
 @router.callback_query(F.data == "start_add_habit")
@@ -151,6 +154,7 @@ async def start_add_habit(call: CallbackQuery, state: FSMContext):
         ]),
     )
     await state.update_data(last_msg_id=msg.message_id)
+    await call.answer()
 
 
 @router.message(QuestStates.add_habit)
@@ -196,6 +200,7 @@ async def show_stats(call: CallbackQuery, state: FSMContext):
         ]),
         parse_mode="Markdown",
     )
+    await call.answer()
 
 
 @router.callback_query(F.data == "go_categories")
@@ -204,6 +209,7 @@ async def show_categories(call: CallbackQuery, state: FSMContext):
     kb = [[InlineKeyboardButton(text=f"#{c}", callback_data=f"cat_{c}")] for c in cats]
     kb.append([InlineKeyboardButton(text="🔙 Назад", callback_data="go_start")])
     await call.message.edit_text("📂 Ваши категории:", reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+    await call.answer()
 
 
 @router.callback_query(F.data.startswith("cat_"))
@@ -223,6 +229,7 @@ async def show_category_quests(call: CallbackQuery, state: FSMContext):
         text if quests else "Пусто.",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=kb_list),
     )
+    await call.answer()
 
 
 @router.callback_query(F.data == "get_motivation")

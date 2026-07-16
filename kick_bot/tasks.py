@@ -9,7 +9,7 @@ import database
 
 logger = logging.getLogger(__name__)
 
-KIEV_TZ = pytz.timezone("Europe/Kiev")
+KIEV_TZ = pytz.timezone("Europe/Kyiv")
 
 # Пороги ОБЯЗАТЕЛЬНО должны идти от МЕНЬШЕГО к БОЛЬШЕМУ,
 # иначе цикл в check_deadlines всегда будет находить "48ч" первым.
@@ -43,8 +43,8 @@ async def check_deadlines(bot: Bot):
                     if old_msg_id:
                         try:
                             await bot.delete_message(chat_id=user_id, message_id=old_msg_id)
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.debug(f"Не удалось удалить сообщение {old_msg_id} квеста {q_id}: {e}")
                     await database.mark_quest_failed(q_id, now.isoformat())
                     await bot.send_message(user_id, f"💀 Квест «{title}» провален!")
                     continue
@@ -57,8 +57,8 @@ async def check_deadlines(bot: Bot):
                             if old_msg_id:
                                 try:
                                     await bot.delete_message(chat_id=user_id, message_id=old_msg_id)
-                                except Exception:
-                                    pass
+                                except Exception as e:
+                                    logger.debug(f"Не удалось удалить сообщение {old_msg_id} квеста {q_id}: {e}")
 
                             # 2. Отправляем новое сообщение
                             msg = await bot.send_message(
@@ -98,8 +98,8 @@ async def check_habit_reminders(bot: Bot):
                 if last_message_id:
                     try:
                         await bot.delete_message(chat_id=user_id, message_id=last_message_id)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"Не удалось удалить сообщение {last_message_id} привычки {h_id}: {e}")
 
                 msg = await bot.send_message(
                     user_id,

@@ -1,3 +1,4 @@
+import logging
 import re
 import pytz
 from datetime import datetime, timedelta
@@ -6,7 +7,9 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 import database
 
-KIEV_TZ = pytz.timezone("Europe/Kiev")
+logger = logging.getLogger(__name__)
+
+KIEV_TZ = pytz.timezone("Europe/Kyiv")
 
 
 def get_main_kb():
@@ -25,8 +28,8 @@ async def cleanup_quest_message(bot, user_id, quest_id):
     if message_id:
         try:
             await bot.delete_message(chat_id=user_id, message_id=message_id)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Не удалось удалить сообщение {message_id} квеста {quest_id}: {e}")
         await database.clear_quest_last_message_id(quest_id)
 
 
@@ -35,8 +38,8 @@ async def cleanup_habit_message(bot, user_id, habit_id):
     if message_id:
         try:
             await bot.delete_message(chat_id=user_id, message_id=message_id)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Не удалось удалить сообщение {message_id} привычки {habit_id}: {e}")
         await database.clear_habit_last_message_id(habit_id)
 
 

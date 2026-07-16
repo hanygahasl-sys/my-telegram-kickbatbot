@@ -2,7 +2,7 @@ import aiosqlite
 from datetime import datetime, timedelta
 import pytz
 
-KIEV_TZ = pytz.timezone("Europe/Kiev")
+KIEV_TZ = pytz.timezone("Europe/Kyiv")
 DB_NAME = "quests.db"
 
 
