@@ -3,6 +3,7 @@ import re
 import pytz
 from datetime import datetime, timedelta
 
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 import database
@@ -15,6 +16,33 @@ KIEV_TZ = pytz.timezone("Europe/Kyiv")
 HOURS_PATTERN = r'(\d+)\s*ч(?:ас(?:ов|а)?)?'
 # Терпимы к пробелу и полным словам: "30м", "30 м", "30мин", "30 минут", "30 минуты"
 MINUTES_PATTERN = r'(\d+)\s*м(?:ин(?:ут(?:ы)?)?)?'
+
+
+async def safe_edit_text(message, text, **kwargs):
+    """
+    Редактирует сообщение через message.edit_text, но не падает,
+    если новый текст/разметка идентичны текущим (Telegram в этом
+    случае возвращает ошибку "message is not modified" — это не
+    настоящая проблема, и её нужно просто проигнорировать).
+    """
+    try:
+        return await message.edit_text(text, **kwargs)
+    except TelegramBadRequest as e:
+        if "message is not modified" in str(e).lower():
+            return None
+        raise
+
+
+async def safe_edit_message_text(bot, chat_id, message_id, text, **kwargs):
+    """То же самое, но для bot.edit_message_text (когда нет объекта message)."""
+    try:
+        return await bot.edit_message_text(
+            chat_id=chat_id, message_id=message_id, text=text, **kwargs
+        )
+    except TelegramBadRequest as e:
+        if "message is not modified" in str(e).lower():
+            return None
+        raise
 
 
 def get_main_kb():

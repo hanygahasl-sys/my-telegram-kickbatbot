@@ -262,3 +262,28 @@ async def update_quest_last_message_id(quest_id, message_id):
             (message_id, quest_id)
         )
         await db.commit()
+
+
+# --- Архив квестов (Победы / Поражения с пагинацией) ---
+# Отдельная таблица не заводится: колонки title/status/finished_at
+# уже есть в quests и заполняются в change_quest_status/mark_quest_failed.
+
+async def get_quest_history_count(user_id, status):
+    async with aiosqlite.connect(DB_NAME) as db:
+        async with db.execute(
+            "SELECT COUNT(*) FROM quests WHERE user_id = ? AND status = ?",
+            (user_id, status),
+        ) as cursor:
+            row = await cursor.fetchone()
+            return row[0] if row else 0
+
+
+async def get_quest_history_page(user_id, status, offset, limit):
+    async with aiosqlite.connect(DB_NAME) as db:
+        async with db.execute(
+            "SELECT title, finished_at FROM quests "
+            "WHERE user_id = ? AND status = ? "
+            "ORDER BY finished_at DESC LIMIT ? OFFSET ?",
+            (user_id, status, limit, offset),
+        ) as cursor:
+            return await cursor.fetchall()

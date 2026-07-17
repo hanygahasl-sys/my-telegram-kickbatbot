@@ -13,6 +13,8 @@ KIEV_TZ = pytz.timezone("Europe/Kyiv")
 
 # Пороги ОБЯЗАТЕЛЬНО должны идти от МЕНЬШЕГО к БОЛЬШЕМУ,
 # иначе цикл в check_deadlines всегда будет находить "48ч" первым.
+# text больше не используется как готовый текст сообщения — он остался
+# только для читаемости; реальное время считается динамически (см. ниже).
 DEADLINE_THRESHOLDS = [
     (1800, "30м", "0.5"),
     (3600, "1ч", "1"),
@@ -20,6 +22,17 @@ DEADLINE_THRESHOLDS = [
     (43200, "12ч", "12"),
     (172800, "48ч", "48"),
 ]
+
+
+def format_remaining(seconds_left: int) -> str:
+    """Форматирует реальное оставшееся время, а не метку ближайшего порога."""
+    hours = seconds_left // 3600
+    minutes = (seconds_left % 3600) // 60
+    if hours > 0 and minutes > 0:
+        return f"{hours}ч {minutes}м"
+    if hours > 0:
+        return f"{hours}ч"
+    return f"{minutes}м"
 
 
 async def check_deadlines(bot: Bot):
@@ -60,10 +73,11 @@ async def check_deadlines(bot: Bot):
                                 except Exception as e:
                                     logger.debug(f"Не удалось удалить сообщение {old_msg_id} квеста {q_id}: {e}")
 
-                            # 2. Отправляем новое сообщение
+                            # 2. Отправляем новое сообщение с РЕАЛЬНЫМ оставшимся временем
+                            remaining_str = format_remaining(seconds_left)
                             msg = await bot.send_message(
                                 user_id,
-                                f"⚠️ **Напоминание!**\n\nКвест «{title}» заканчивается через {text}!",
+                                f"⚠️ **Напоминание!**\n\nКвест «{title}» заканчивается через {remaining_str}!",
                                 parse_mode="Markdown",
                             )
 

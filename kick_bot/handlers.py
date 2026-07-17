@@ -19,9 +19,14 @@ from utils import (
     parse_deadline,
     HOURS_PATTERN,
     MINUTES_PATTERN,
+    safe_edit_text,
+    safe_edit_message_text,
 )
 
 router = Router()
+
+PAGE_SIZE = 10
+HISTORY_LABELS = {"won": ("🏆", "Победы"), "failed": ("💀", "Поражения")}
 
 
 class QuestStates(StatesGroup):
@@ -45,7 +50,8 @@ async def cmd_start(msg: Message, state: FSMContext):
 @router.callback_query(F.data == "go_start")
 async def back_to_menu(call: CallbackQuery, state: FSMContext):
     await state.set_state(QuestStates.menu)
-    await call.message.edit_text(
+    await safe_edit_text(
+        call.message,
         "🎮 **Quest Manager**\nВыберите действие:",
         reply_markup=get_main_kb(),
         parse_mode="Markdown",
@@ -78,7 +84,8 @@ async def show_list(call: CallbackQuery, state: FSMContext):
                 InlineKeyboardButton(text="❌ Сдаться", callback_data=f"fail_{q[0]}"),
             ])
     kb_list.append([InlineKeyboardButton(text="🔙 Назад", callback_data="go_start")])
-    await call.message.edit_text(
+    await safe_edit_text(
+        call.message,
         text,
         reply_markup=InlineKeyboardMarkup(inline_keyboard=kb_list),
         parse_mode="Markdown",
@@ -101,13 +108,14 @@ async def process_quest_result(call: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "go_add")
 async def start_add(call: CallbackQuery, state: FSMContext):
     await state.set_state(QuestStates.add_quest)
-    msg = await call.message.edit_text(
+    msg = await safe_edit_text(
+        call.message,
         "✍️ Введите название задачи (например: Бег 5ч #спорт):",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="❌ Отмена", callback_data="go_start")],
         ]),
     )
-    await state.update_data(last_msg_id=msg.message_id)
+    await state.update_data(last_msg_id=msg.message_id if msg else call.message.message_id)
     await call.answer()
 
 
@@ -127,7 +135,8 @@ async def process_add(msg: Message, state: FSMContext):
     data = await state.get_data()
     await msg.delete()
     await state.set_state(QuestStates.menu)
-    await msg.bot.edit_message_text(
+    await safe_edit_message_text(
+        msg.bot,
         chat_id=msg.chat.id,
         message_id=data.get("last_msg_id"),
         text="✅ Квест добавлен!\n\n🎮 **Quest Manager**\nВыберите действие:",
@@ -138,7 +147,8 @@ async def process_add(msg: Message, state: FSMContext):
 
 @router.callback_query(F.data == "go_habits")
 async def show_habits(call: CallbackQuery, state: FSMContext):
-    await call.message.edit_text(
+    await safe_edit_text(
+        call.message,
         "🔥 **Твои привычки:**",
         reply_markup=await get_habits_markup(call.from_user.id),
         parse_mode="Markdown",
@@ -149,13 +159,14 @@ async def show_habits(call: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "start_add_habit")
 async def start_add_habit(call: CallbackQuery, state: FSMContext):
     await state.set_state(QuestStates.add_habit)
-    msg = await call.message.edit_text(
+    msg = await safe_edit_text(
+        call.message,
         "✍️ Введите название новой привычки:",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="❌ Отмена", callback_data="go_habits")],
         ]),
     )
-    await state.update_data(last_msg_id=msg.message_id)
+    await state.update_data(last_msg_id=msg.message_id if msg else call.message.message_id)
     await call.answer()
 
 
@@ -164,7 +175,8 @@ async def process_add_habit(msg: Message, state: FSMContext):
     await database.add_habit(msg.from_user.id, msg.text)
     await msg.delete()
     data = await state.get_data()
-    await msg.bot.edit_message_text(
+    await safe_edit_message_text(
+        msg.bot,
         chat_id=msg.chat.id,
         message_id=data.get("last_msg_id"),
         text="✅ Привычка добавлена!\n\n🔥 **Твои привычки:**",
@@ -195,9 +207,12 @@ async def show_stats(call: CallbackQuery, state: FSMContext):
         f"📊 **Статистика:**\n\nОбщая:\n✅ Побед: {won} | ❌ Поражений: {failed}\n\n"
         f"За сегодня:\n✅ Выполнено: {daily_won} | 💀 Провалено: {daily_failed}"
     )
-    await call.message.edit_text(
+    await safe_edit_text(
+        call.message,
         text,
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🏆 Победы", callback_data="hist_won_0")],
+            [InlineKeyboardButton(text="💀 Поражения", callback_data="hist_failed_0")],
             [InlineKeyboardButton(text="🔙 Назад", callback_data="go_start")],
         ]),
         parse_mode="Markdown",
@@ -210,7 +225,7 @@ async def show_categories(call: CallbackQuery, state: FSMContext):
     cats = await database.get_categories(call.from_user.id)
     kb = [[InlineKeyboardButton(text=f"#{c}", callback_data=f"cat_{c}")] for c in cats]
     kb.append([InlineKeyboardButton(text="🔙 Назад", callback_data="go_start")])
-    await call.message.edit_text("📂 Ваши категории:", reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+    await safe_edit_text(call.message, "📂 Ваши категории:", reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
     await call.answer()
 
 
@@ -227,7 +242,8 @@ async def show_category_quests(call: CallbackQuery, state: FSMContext):
         for q in quests
     ]
     kb_list.append([InlineKeyboardButton(text="🔙 Назад", callback_data="go_categories")])
-    await call.message.edit_text(
+    await safe_edit_text(
+        call.message,
         text if quests else "Пусто.",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=kb_list),
     )
@@ -237,3 +253,62 @@ async def show_category_quests(call: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "get_motivation")
 async def send_motivation(call: CallbackQuery):
     await call.answer(text=random.choice(MOTIVATION_PHRASES), show_alert=True)
+
+
+def _format_history_text(items, status, page, total_pages):
+    icon, label = HISTORY_LABELS[status]
+    if not items:
+        return f"{icon} **{label}**\n\nИстория пуста."
+
+    lines = [f"{icon} **{label}** (страница {page + 1} из {total_pages})\n"]
+    for title, finished_at in items:
+        try:
+            dt = datetime.fromisoformat(finished_at) if finished_at else None
+            date_str = dt.strftime("%d.%m.%Y %H:%M") if dt else "—"
+        except ValueError:
+            date_str = "—"
+        lines.append(f"• {title} — {date_str}")
+    return "\n".join(lines)
+
+
+def _build_history_kb(status, page, total_pages):
+    nav_row = []
+    if page > 0:
+        nav_row.append(InlineKeyboardButton(text="⬅️ Назад", callback_data=f"hist_{status}_{page - 1}"))
+    if total_pages > 0:
+        nav_row.append(InlineKeyboardButton(text=f"Страница {page + 1} из {total_pages}", callback_data="hist_noop"))
+    if page < total_pages - 1:
+        nav_row.append(InlineKeyboardButton(text="Вперед ➡️", callback_data=f"hist_{status}_{page + 1}"))
+
+    kb = []
+    if nav_row:
+        kb.append(nav_row)
+    kb.append([InlineKeyboardButton(text="🔙 Назад в статистику", callback_data="go_stats")])
+    return InlineKeyboardMarkup(inline_keyboard=kb)
+
+
+@router.callback_query(F.data == "hist_noop")
+async def history_noop(call: CallbackQuery):
+    # Кнопка-индикатор "Страница X из Y" — не должна ничего делать,
+    # просто гасим спиннер загрузки на кнопке.
+    await call.answer()
+
+
+@router.callback_query(F.data.startswith("hist_"))
+async def show_history(call: CallbackQuery, state: FSMContext):
+    _, status, page_str = call.data.split("_")
+    page = int(page_str)
+
+    total = await database.get_quest_history_count(call.from_user.id, status)
+    total_pages = (total + PAGE_SIZE - 1) // PAGE_SIZE  # 0, если записей нет
+    page = max(0, min(page, max(total_pages - 1, 0)))
+
+    items = await database.get_quest_history_page(
+        call.from_user.id, status, offset=page * PAGE_SIZE, limit=PAGE_SIZE
+    )
+
+    text = _format_history_text(items, status, page, total_pages)
+    kb = _build_history_kb(status, page, total_pages)
+
+    await safe_edit_text(call.message, text, reply_markup=kb, parse_mode="Markdown")
+    await call.answer()
